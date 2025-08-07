@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Join Meeting Room - Meet Clone</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Google Sans', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 450px;
+            width: 100%;
+        }
+
+        .logo {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            font-weight: 400;
+            font-size: 24px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: border-color 0.2s ease;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #4285f4;
+        }
+
+        input::placeholder {
+            color: #9aa0a6;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #4285f4 0%, #34a853 100%);
+            color: white;
+            border: none;
+            padding: 14px 24px;
+            border-radius: 24px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            flex: 1;
+            transition: all 0.2s ease;
+            text-transform: none;
+            position: relative;
+            overflow: hidden;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(66, 133, 244, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .create-btn {
+            background: linear-gradient(135deg, #ea4335 0%, #fbbc05 100%);
+        }
+
+        .create-btn:hover:not(:disabled) {
+            box-shadow: 0 4px 12px rgba(234, 67, 53, 0.4);
+        }
+
+        .divider {
+            margin: 30px 0;
+            padding: 20px 0;
+            border-top: 1px solid #e8eaed;
+            position: relative;
+        }
+
+        .divider::before {
+            content: "OR";
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 0 15px;
+            color: #5f6368;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .room-code-display {
+            background: #f8f9fa;
+            border: 2px dashed #dadce0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .room-code-display.active {
+            display: block;
+        }
+
+        .room-code {
+            background: #e8f0fe;
+            color: #1967d2;
+            padding: 12px 16px;
+            border-radius: 6px;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 18px;
+            font-weight: bold;
+            margin: 10px 0;
+            user-select: all;
+            border: 1px solid #dadce0;
+        }
+
+        .copy-btn {
+            background: #1a73e8;
+            padding: 10px 20px;
+            font-size: 13px;
+            margin: 8px 4px;
+            border-radius: 6px;
+        }
+
+        .copy-btn:hover:not(:disabled) {
+            background: #1557b0;
+            box-shadow: 0 2px 8px rgba(26, 115, 232, 0.4);
+        }
+
+        .join-created-btn {
+            background: linear-gradient(135deg, #34a853 0%, #4285f4 100%);
+        }
+
+        .instructions {
+            text-align: left;
+            color: #5f6368;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-top: 20px;
+        }
+
+        .instructions strong {
+            color: #202124;
+        }
+
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #5f6368;
+        }
+
+        .feature-icon {
+            font-size: 16px;
+        }
+
+        .error-message {
+            background: #fce8e6;
+            color: #d93025;
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin: 16px 0;
+            font-size: 14px;
+            border-left: 4px solid #ea4335;
+            display: none;
+        }
+
+        .success-message {
+            background: #e6f4ea;
+            color: #137333;
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin: 16px 0;
+            font-size: 14px;
+            border-left: 4px solid #34a853;
+            display: none;
+        }
+
+        /* Loading animation */
+        .loading {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            color: #fff;
+            font-size: 14px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%;
+        }
+
+        .loading.active {
+            display: flex;
+        }
+
+        .loading.active ~ .button-text {
+            opacity: 0;
+        }
+
+        .button-text {
+            transition: opacity 0.2s ease;
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive design */
+        @media (max-width: 480px) {
+            .container {
+                padding: 30px 20px;
+                margin: 10px;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+
+            .feature-list {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🎥</div>
+        <h1>Meet Clone</h1>
+
+        <div class="error-message" id="errorMessage"></div>
+        <div class="success-message" id="successMessage"></div>
+
+        <!-- Join existing room -->
+        <div class="input-group">
+            <label for="displayName">Your Name:</label>
+            <input type="text" id="displayName" placeholder="Enter your name" value="Guest User" />
+        </div>
+
+        <div class="input-group">
+            <label for="roomInput">Room Code:</label>
+            <input type="text" id="roomInput" placeholder="Enter room code (e.g., abc12345)" />
+        </div>
+
+        <div class="button-group">
+            <button id="joinBtn" onclick="joinRoom()">
+                <span class="button-text">Join Room</span>
+                <div class="loading" id="joinLoading">
+                    <div class="spinner"></div>
+                    <span>Joining...</span>
+                </div>
+            </button>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Create new room -->
+        <button id="createBtn" class="create-btn" onclick="createRoom()">
+            <span class="button-text">Create New Room</span>
+            <div class="loading" id="createLoading">
+                <div class="spinner"></div>
+                <span>Creating...</span>
+            </div>
+        </button>
+
+        <!-- Room code display -->
+        <div class="room-code-display" id="roomCodeDisplay">
+            <p><strong>Room created successfully!</strong></p>
+            <p>Share this code with others:</p>
+            <div class="room-code" id="roomCode"></div>
+            <div class="button-group">
+                <button class="copy-btn" onclick="copyRoomCode()">📋 Copy Code</button>
+                <button class="join-created-btn" onclick="joinCreatedRoom()">🚀 Join Room</button>
+            </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="instructions">
+            <strong>How to use:</strong>
+            <div class="feature-list">
+                <div class="feature-item">
+                    <span class="feature-icon">🎥</span>
+                    <span>Video & Audio calls</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">👥</span>
+                    <span>Up to 6 participants</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🔒</span>
+                    <span>Private rooms</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">📱</span>
+                    <span>Works on all devices</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let generatedRoomId = '';
+
+        // Show/hide loading states
+        function showLoading(buttonId) {
+            const button = document.getElementById(buttonId);
+            const loading = button.querySelector('.loading');
+
+            button.disabled = true;
+            loading.classList.add('active');
+        }
+
+        function hideLoading(buttonId) {
+            const button = document.getElementById(buttonId);
+            const loading = button.querySelector('.loading');
+
+            button.disabled = false;
+            loading.classList.remove('active');
+        }
+
+        // Show error/success messages
+        function showError(message) {
+            const errorEl = document.getElementById('errorMessage');
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+            setTimeout(() => { errorEl.style.display = 'none'; }, 5000);
+        }
+
+        function showSuccess(message) {
+            const successEl = document.getElementById('successMessage');
+            successEl.textContent = message;
+            successEl.style.display = 'block';
+            setTimeout(() => { successEl.style.display = 'none'; }, 5000);
+        }
+
+        // Join existing room
+        async function joinRoom() {
+            const roomCode = document.getElementById('roomInput').value.trim();
+            const displayName = document.getElementById('displayName').value.trim();
+
+            if (!roomCode) {
+                showError('Please enter a room code');
+                return;
+            }
+
+            if (!displayName) {
+                showError('Please enter your name');
+                return;
+            }
+
+            showLoading('joinBtn');
+
+            try {
+                // Check if room exists first
+                const roomResponse = await fetch(`/api/rooms/${roomCode}`);
+
+                if (!roomResponse.ok) {
+                    if (roomResponse.status === 404) {
+                        throw new Error('Room not found. Please check the room code.');
+                    } else {
+                        throw new Error('Failed to connect to room. Please try again.');
+                    }
+                }
+
+                const roomInfo = await roomResponse.json();
+
+                if (roomInfo.participant_count >= roomInfo.max_participants) {
+                    throw new Error('Room is full. Please try again later.');
+                }
+
+                // Join the room via API
+                const joinResponse = await fetch(`/api/rooms/${roomCode}/join`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        display_name: displayName
+                    })
+                });
+
+                if (!joinResponse.ok) {
+                    const errorData = await joinResponse.json();
+                    throw new Error(errorData.detail || 'Failed to join room');
+                }
+
+                const userInfo = await joinResponse.json();
+                console.log('Successfully joined room:', userInfo);
+
+                // Store user info in localStorage for the main app
+                localStorage.setItem('meetUserInfo', JSON.stringify({
+                    ...userInfo,
+                    roomId: roomCode
+                }));
+
+                // Redirect to the main meeting interface
+                window.location.href = `/room/${encodeURIComponent(roomCode)}?name=${encodeURIComponent(displayName)}&userId=${userInfo.user_id}`;
+
+            } catch (error) {
+                console.error('Join room error:', error);
+                hideLoading('joinBtn');
+                showError(error.message || 'Failed to join room. Please check the room code and try again.');
+            }
+        }
+
+        // Create new room
+        async function createRoom() {
+            const displayName = document.getElementById('displayName').value.trim();
+
+            if (!displayName) {
+                showError('Please enter your name');
+                return;
+            }
+
+            showLoading('createBtn');
+
+            try {
+                const response = await fetch('/api/rooms', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        max_participants: 6
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Failed to create room');
+                }
+
+                const result = await response.json();
+                generatedRoomId = result.room_id;
+
+                // Show room code
+                document.getElementById('roomCode').textContent = generatedRoomId;
+                document.getElementById('roomCodeDisplay').classList.add('active');
+
+                showSuccess('Room created successfully! Share the code with others to join.');
+
+            } catch (error) {
+                console.error('Create room error:', error);
+                showError(error.message || 'Failed to create room. Please try again.');
+            } finally {
+                hideLoading('createBtn');
+            }
+        }
+
+        // Copy room code to clipboard
+        async function copyRoomCode() {
+            try {
+                await navigator.clipboard.writeText(generatedRoomId);
+                showSuccess('Room code copied to clipboard!');
+            } catch (err) {
+                console.error('Failed to copy: ', err);
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = generatedRoomId;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showSuccess('Room code copied to clipboard!');
+            }
+        }
+
+        // Join the created room
+        async function joinCreatedRoom() {
+            const displayName = document.getElementById('displayName').value.trim();
+
+            if (!displayName) {
+                showError('Please enter your name');
+                return;
+            }
+
+            try {
+                // Join the room via API first
+                const joinResponse = await fetch(`/api/rooms/${generatedRoomId}/join`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        display_name: displayName
+                    })
+                });
+
+                if (!joinResponse.ok) {
+                    const errorData = await joinResponse.json();
+                    throw new Error(errorData.detail || 'Failed to join room');
+                }
+
+                const userInfo = await joinResponse.json();
+
+                // Store user info for the main app
+                localStorage.setItem('meetUserInfo', JSON.stringify({
+                    ...userInfo,
+                    roomId: generatedRoomId
+                }));
+
+                window.location.href = `/room/${encodeURIComponent(generatedRoomId)}?name=${encodeURIComponent(displayName)}&userId=${userInfo.user_id}`;
+            } catch (error) {
+                showError(error.message || 'Failed to join the created room');
+            }
+        }
+
+        // Allow Enter key to join room
+        document.getElementById('roomInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                joinRoom();
+            }
+        });
+
+        document.getElementById('displayName').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                if (document.getElementById('roomInput').value.trim()) {
+                    joinRoom();
+                } else {
+                    createRoom();
+                }
+            }
+        });
+
+        // Auto-focus on name input
+        window.addEventListener('load', () => {
+            document.getElementById('displayName').focus();
+        });
+
+        // Clear any existing user data when page loads
+        window.addEventListener('load', () => {
+            localStorage.removeItem('meetUserInfo');
+        });
+    </script>
+</body>
+</html>

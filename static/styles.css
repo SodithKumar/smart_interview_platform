@@ -1,0 +1,77 @@
+/* This CSS is now embedded in the HTML files, but you can extract it here if needed */
+
+body {
+  margin: 0;
+  background-color: #202124;
+  font-family: 'Google Sans', Arial, sans-serif;
+  color: white;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.top-bar {
+  background-color: #3c4043;
+  padding: 10px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.meeting-title {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.video-section {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 15px;
+  align-content: start;
+  padding: 20px;
+}
+
+video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #1a1a1a;
+}
+
+.bottom-bar {
+  background-color: #3c4043;
+  padding: 15px;
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  box-shadow: 0 -2px 4px rgba(0,0,0,0.2);
+}
+
+button {
+  background-color: #5f6368;
+  border: none;
+  padding: 12px;
+  border-radius: 50%;
+  font-size: 18px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+button:hover {
+  background-color: #6c757d;
+  transform: translateY(-1px);
+}
+
+button.leave {
+  background-color: #ea4335;
+  border-radius: 24px;
+  padding: 12px 24px;
+}
+
+button.leave:hover {
+  background-color: #d33b2c;
+}
