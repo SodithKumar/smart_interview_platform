@@ -24,11 +24,8 @@ RUN pip install --upgrade pip
 # Install requirements
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Make port available (adjust as per your app)
+# Expose port (adjust if needed)
 EXPOSE 8060
 
-# Make entrypoint executable
-RUN chmod +x entrypoint.sh
-
-# Run app via entrypoint script
-CMD ["/app/entrypoint.sh"]
+# Start the app using gunicorn + uvicorn worker
+CMD ["gunicorn", "main:app", "-w", "2", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8060"]
