@@ -1,6 +1,7 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware  # ADD THIS
 from pydantic import BaseModel
 import uvicorn
 import json
@@ -17,8 +18,20 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="WebRTC Video Call Server", version="1.0.0")
+
+# ADD CORS MIDDLEWARE - CRITICAL FOR PRODUCTION
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, you can specify your domain
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+
+# ... rest of your existing code stays exactly the same ...
 
 # Pydantic models for API requests
 class CreateRoomRequest(BaseModel):
@@ -33,6 +46,8 @@ class MediaStatusUpdate(BaseModel):
     audio_enabled: bool
     video_enabled: bool
 
+
+# ... (keep all your existing FileStorageManager class exactly as is) ...
 
 class FileStorageManager:
     """File-based storage manager for rooms and participants"""
@@ -189,7 +204,12 @@ class ConnectionManager:
 
     async def connect(self, websocket: WebSocket, room_id: str, user_id: str, display_name: str):
         """Connect user to room"""
-        await websocket.accept()
+        try:
+            await websocket.accept()
+            logger.info(f"WebSocket accepted for user {user_id} in room {room_id}")  # ADD LOGGING
+        except Exception as e:
+            logger.error(f"Failed to accept WebSocket for user {user_id}: {e}")  # ADD ERROR LOGGING
+            raise
 
         # Initialize room if it doesn't exist in active connections
         if room_id not in self.active_connections:
@@ -297,6 +317,8 @@ storage = FileStorageManager()
 manager = ConnectionManager(storage)
 
 
+# ... (keep all your existing API routes exactly as they are) ...
+
 # API Routes
 @app.post("/api/rooms")
 async def create_room(request: CreateRoomRequest):
@@ -380,10 +402,12 @@ async def get_join_page():
     """Main landing page - redirect to join page"""
     return FileResponse("static/room.html")  # This should be your join page
 
+
 @app.get("/join")
 async def get_join_page_explicit():
     """Join page"""
     return FileResponse("static/room.html")  # Your join page HTML
+
 
 @app.get("/room/{room_id}")
 async def get_room_interface(room_id: str):
@@ -391,22 +415,25 @@ async def get_room_interface(room_id: str):
     return FileResponse("static/index.html")  # Your main video call HTML
 
 
-# Enhanced WebSocket endpoint
+# MODIFY WEBSOCKET ENDPOINT FOR BETTER ERROR HANDLING
 @app.websocket("/ws/{room_id}/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, room_id: str, user_id: str):
     """Enhanced WebSocket endpoint with user_id"""
 
-    # Get user info from storage
-    participants = storage.get_room_participants(room_id)
-    user_info = next((p for p in participants if p["user_id"] == user_id), None)
-
-    if not user_info:
-        await websocket.close(code=4004, reason="User not found in room")
-        return
-
-    await manager.connect(websocket, room_id, user_id, user_info["display_name"])
+    logger.info(f"WebSocket connection attempt for user {user_id} in room {room_id}")
 
     try:
+        # Get user info from storage
+        participants = storage.get_room_participants(room_id)
+        user_info = next((p for p in participants if p["user_id"] == user_id), None)
+
+        if not user_info:
+            logger.error(f"User {user_id} not found in room {room_id}")
+            await websocket.close(code=4004, reason="User not found in room")
+            return
+
+        await manager.connect(websocket, room_id, user_id, user_info["display_name"])
+
         while True:
             data = await websocket.receive_text()
 
@@ -457,9 +484,9 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, user_id: str):
 
     except WebSocketDisconnect:
         logger.info(f"WebSocket disconnected for user {user_id} in room {room_id}")
-        await manager.disconnect(websocket)
     except Exception as e:
         logger.error(f"Unexpected error in websocket for user {user_id}: {e}")
+    finally:
         await manager.disconnect(websocket)
 
 
@@ -473,5 +500,8 @@ async def health_check():
     }
 
 
+# MODIFY THE RUN CONFIGURATION FOR PRODUCTION
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.getenv("PORT", 8000))
+    host = os.getenv("HOST", "0.0.0.0")
+    uvicorn.run("main:app", host=host, port=port, reload=False)

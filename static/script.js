@@ -189,7 +189,7 @@ async function joinRoomAPI() {
   }
 }
 
-// Connect to WebSocket
+// MODIFY THIS FUNCTION - THE KEY FIX FOR PRODUCTION
 async function connectWebSocket() {
   return new Promise((resolve, reject) => {
     if (!userInfo || !userInfo.user_id) {
@@ -197,33 +197,52 @@ async function connectWebSocket() {
       return;
     }
 
-    // Use the current hostname and determine protocol
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    const wsUrl = `${protocol}//${host}/ws/${roomId}/${userInfo.user_id}`;
+    // ENHANCED URL CONSTRUCTION FOR PRODUCTION
+    let wsUrl;
+
+    // Check if we're in a development environment
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      // Development
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.host;
+      wsUrl = `${protocol}//${host}/ws/${roomId}/${userInfo.user_id}`;
+    } else {
+      // Production - force WSS if HTTPS, otherwise use current protocol
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.host;
+      wsUrl = `${protocol}//${host}/ws/${roomId}/${userInfo.user_id}`;
+    }
 
     console.log('Connecting to WebSocket:', wsUrl);
+
+    // ADD CONNECTION TIMEOUT AND RETRY LOGIC
+    let connectionTimeout = setTimeout(() => {
+      console.error('WebSocket connection timeout');
+      reject(new Error('Connection timeout - please check your internet connection'));
+    }, 15000); // 15 second timeout
+
     ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
-      console.log('WebSocket connected');
+      console.log('WebSocket connected successfully');
+      clearTimeout(connectionTimeout);
       resolve();
     };
 
     ws.onerror = (error) => {
       console.error('WebSocket error:', error);
-      reject(new Error('WebSocket connection failed'));
+      clearTimeout(connectionTimeout);
+
+      // More specific error handling
+      if (ws.readyState === WebSocket.CLOSED) {
+        reject(new Error('WebSocket connection failed - server may be unavailable'));
+      } else {
+        reject(new Error('WebSocket connection error'));
+      }
     };
 
     ws.onmessage = handleWebSocketMessage;
     ws.onclose = handleWebSocketClose;
-
-    // Timeout after 10 seconds
-    setTimeout(() => {
-      if (ws.readyState !== WebSocket.OPEN) {
-        reject(new Error('WebSocket connection timeout'));
-      }
-    }, 10000);
   });
 }
 
@@ -488,7 +507,7 @@ function handleRoomEnded(message) {
   window.location.href = '/join';
 }
 
-// Handle WebSocket close
+// MODIFY WEBSOCKET CLOSE HANDLER FOR BETTER RECONNECTION
 function handleWebSocketClose(event) {
   console.log('WebSocket connection closed:', event.code, event.reason);
 
@@ -497,12 +516,19 @@ function handleWebSocketClose(event) {
   // Attempt to reconnect if the close was unexpected
   if (event.code !== 1000 && event.code !== 1001) {
     console.log('Attempting to reconnect...');
-    setTimeout(() => {
+    showLoading('Connection lost, reconnecting...');
+
+    setTimeout(async () => {
       if (!ws || ws.readyState === WebSocket.CLOSED) {
-        connectWebSocket().catch(error => {
+        try {
+          await connectWebSocket();
+          hideLoading();
+          console.log('Reconnected successfully');
+        } catch (error) {
           console.error('Reconnection failed:', error);
+          hideLoading();
           showErrorAndRedirect('Connection lost. Redirecting to join page...');
-        });
+        }
       }
     }, 2000);
   }
