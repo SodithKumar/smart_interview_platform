@@ -49,13 +49,30 @@ class RecorderSession:
                 logger.exception("[recorder] failed to add track: %s", e)
                 return
 
+            # ✅ Only start when we see a video track OR if user never sends video (audio-only case)
             if not self.recorder_started:
-                try:
-                    await self.recorder.start()
-                    self.recorder_started = True
-                    logger.info(f"[recorder] started recording to {self.out_file}")
-                except Exception as e:
-                    logger.exception("[recorder] failed to start recorder: %s", e)
+                if track.kind == "video":
+                    # ✅ Start immediately when video arrives
+                    try:
+                        await self.recorder.start()
+                        self.recorder_started = True
+                        logger.info(f"[recorder] started recording (video+audio) to {self.out_file}")
+                    except Exception as e:
+                        logger.exception("[recorder] failed to start recorder: %s", e)
+                elif track.kind == "audio":
+                    # ✅ Delay audio-only start by 2s in case video comes later
+                    import asyncio
+                    async def delayed_start():
+                        await asyncio.sleep(2)
+                        if not self.recorder_started:
+                            try:
+                                await self.recorder.start()
+                                self.recorder_started = True
+                                logger.info(f"[recorder] started recording (audio-only) to {self.out_file}")
+                            except Exception as e:
+                                logger.exception("[recorder] failed to start recorder: %s", e)
+
+                    asyncio.create_task(delayed_start())
 
             @track.on("ended")
             async def _ended():
