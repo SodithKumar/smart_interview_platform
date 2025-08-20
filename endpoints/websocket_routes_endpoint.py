@@ -10,6 +10,11 @@ router = APIRouter(tags=["WebSocket"])
 storage = FileStorageManager()
 manager = ConnectionManager(storage)
 logger = logging.getLogger(__name__)
+# add at top with other imports
+from service.recorder_service import RecorderManager
+
+recorder = RecorderManager(base_dir="recordings")
+
 
 
 @router.websocket("/ws/{room_id}/{user_id}")
@@ -29,7 +34,9 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, user_id: str):
                 message = json.loads(data)
                 message_type = message.get("type", "unknown")
 
-                if message_type in ["webrtc-offer", "webrtc-answer", "ice-candidate"]:
+                # Original WebRTC handling + Screen sharing WebRTC
+                if message_type in ["webrtc-offer", "webrtc-answer", "ice-candidate",
+                                    "screen-share-offer", "screen-share-answer", "screen-share-ice-candidate"]:
                     target_user = message.get("to_user")
                     if target_user:
                         message["from_user"] = user_id
@@ -44,6 +51,34 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, user_id: str):
                                     "audio_enabled": audio_enabled, "video_enabled": video_enabled}),
                         room_id, exclude_user=user_id
                     )
+
+                # Screen sharing status updates
+                elif message_type in ["screen-share-started", "screen-share-stopped"]:
+                    is_sharing = message_type == "screen-share-started"
+                    await manager.broadcast_to_room(
+                        json.dumps({"type": "user-screen-share-changed", "user_id": user_id,
+                                    "is_sharing": is_sharing}),
+                        room_id, exclude_user=user_id
+                    )
+                elif message_type == "recorder-offer":
+                    # { type:"recorder-offer", sdp:"...", sdpType:"offer" }
+                    sdp = message.get("sdp")
+                    sdp_type = message.get("sdpType", "offer")
+                    answer = await recorder.start_or_renegotiate(room_id, user_id, sdp, sdp_type)
+                    await websocket.send_text(json.dumps({
+                        "type": "recorder-answer",
+                        "sdp": answer["sdp"],
+                        "sdpType": answer["type"]
+                    }))
+
+                elif message_type == "recorder-ice-candidate":
+                    # { type:"recorder-ice-candidate", candidate: {candidate, sdpMid, sdpMLineIndex} | null }
+                    await recorder.add_ice(room_id, user_id, message.get("candidate"))
+
+                elif message_type == "recorder-stop":
+                    await recorder.stop(room_id, user_id)
+                    await websocket.send_text(json.dumps({"type": "recorder-stopped"}))
+
                 else:
                     message["from_user"] = user_id
                     await manager.broadcast_to_room(json.dumps(message), room_id, exclude_user=user_id)
@@ -53,4 +88,8 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, user_id: str):
     except WebSocketDisconnect:
         pass
     finally:
+        try:
+            await recorder.stop(room_id, user_id)
+        except Exception:
+            pass
         await manager.disconnect(websocket)
