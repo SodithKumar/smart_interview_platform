@@ -2,8 +2,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from config import APP_NAME, APP_VERSION, ALLOWED_ORIGINS, logger
-from endpoints import rooms_endpoint, health_endpoint, websocket_routes_endpoint, pages_endpoint, janus_endpoint
-from endpoints.health_endpoint import health_check
+from endpoints import rooms_endpoint, health_endpoint, websocket_routes_endpoint, pages_endpoint
 
 app = FastAPI(title=APP_NAME, version=APP_VERSION)
 
