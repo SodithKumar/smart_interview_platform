@@ -45,6 +45,7 @@ let remoteStreams = new Map(); // {remoteUserId: MediaStream}
 let isMicOn = true;
 let isVideoOn = true;
 let isInitialized = false;
+let recorderPeer = null;
 
 // Show loading screen
 function showLoading(message = 'Joining meeting...') {
@@ -99,12 +100,20 @@ async function initialize() {
     showLoading('Establishing connection...');
 
     // Step 3: Connect to WebSocket
+    try {
     await connectWebSocket();
-
+    try {
+      await startRecorderPeer();
+    } catch (err) {
+      console.warn('Failed to start recorder peer on init:', err);
+    }
     hideLoading();
     isInitialized = true;
     console.log('Initialization complete');
-
+    }
+    catch (err) {
+      console.warn('Failed to connect web socket peer on init:', err);
+    }
   } catch (error) {
     console.error('Initialization failed:', error);
     hideLoading();
@@ -186,6 +195,82 @@ async function joinRoomAPI() {
   } catch (error) {
     console.error('Error joining room:', error);
     throw error;
+  }
+}
+// NEW CODE: Start a hidden PeerConnection that sends local tracks to backend for recording
+async function startRecorderPeer() {
+  if (!localStream) {
+    console.warn('startRecorderPeer: localStream not ready');
+    return;
+  }
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    console.warn('startRecorderPeer: websocket not open yet');
+    return;
+  }
+
+  try {
+    // If already started, return
+    if (recorderPeer) {
+      console.log('Recorder peer already running');
+      return;
+    }
+
+    recorderPeer = new RTCPeerConnection(configuration);
+
+    // Add local tracks to recorder peer
+    localStream.getTracks().forEach(track => {
+      recorderPeer.addTrack(track, localStream);
+    });
+
+    // Send ICE candidates from recorder peer to backend
+    recorderPeer.onicecandidate = (event) => {
+      if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'recorder-ice-candidate',
+          candidate: event.candidate
+        }));
+      }
+    };
+
+    recorderPeer.onconnectionstatechange = () => {
+      console.log('Recorder PC connectionState:', recorderPeer.connectionState);
+      // optional: if closed/failed, cleanup
+      if (recorderPeer.connectionState === 'failed' || recorderPeer.connectionState === 'closed') {
+        // we'll let cleanup() handle removal
+      }
+    };
+
+    // If tracks are added/removed later (e.g., start screen share), renegotiation may be needed
+    recorderPeer.onnegotiationneeded = async () => {
+      try {
+        const offer = await recorderPeer.createOffer();
+        await recorderPeer.setLocalDescription(offer);
+        ws.send(JSON.stringify({
+          type: 'recorder-offer',
+          sdp: offer.sdp,
+          sdpType: offer.type
+        }));
+      } catch (err) {
+        console.warn('Recorder renegotiation failed', err);
+      }
+    };
+
+    // Create initial offer and send to backend via your signaling WebSocket
+    const offer = await recorderPeer.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: false });
+    await recorderPeer.setLocalDescription(offer);
+
+    ws.send(JSON.stringify({
+      type: 'recorder-offer',
+      sdp: offer.sdp,
+      sdpType: offer.type
+    }));
+
+    console.log('Recorder peer started and offer sent');
+  } catch (err) {
+    console.error('startRecorderPeer error:', err);
+    // Cleanup partial peer if something failed
+    try { recorderPeer && recorderPeer.close(); } catch (e) {}
+    recorderPeer = null;
   }
 }
 
@@ -287,6 +372,32 @@ async function handleWebSocketMessage(event) {
 
       case 'error':
         console.error('Server error:', message.message);
+        break;
+            case 'recorder-answer':
+        // Server answered our recorder offer with its SDP
+        try {
+          if (recorderPeer) {
+            await recorderPeer.setRemoteDescription(new RTCSessionDescription({
+              type: message.sdpType || 'answer',
+              sdp: message.sdp
+            }));
+          } else {
+            console.warn('recorder-answer received but recorderPeer is null');
+          }
+        } catch (err) {
+          console.error('Error applying recorder answer:', err);
+        }
+        break;
+
+      case 'recorder-ice-candidate':
+        // (optional) server might send back ICE candidates for recorder peer
+        try {
+          if (recorderPeer && message.candidate) {
+            await recorderPeer.addIceCandidate(new RTCIceCandidate(message.candidate));
+          }
+        } catch (err) {
+          console.warn('Error adding recorder ICE candidate:', err);
+        }
         break;
 
       default:
@@ -768,7 +879,23 @@ async function updateMediaStatusAPI() {
 // Cleanup function
 function cleanup() {
   console.log('Cleaning up resources...');
+    // NEW CODE: close recorder peer if running
+  if (recorderPeer) {
+    try {
+      recorderPeer.close();
+    } catch (e) {
+      console.warn('Error closing recorderPeer:', e);
+    }
+    recorderPeer = null;
+  }
 
+  if (localStream) {
+    localStream.getTracks().forEach(track => {
+      track.stop();
+      console.log('Stopped track:', track.kind);
+    });
+    localStream = null;
+  }
   if (localStream) {
     localStream.getTracks().forEach(track => {
       track.stop();
@@ -804,13 +931,13 @@ window.addEventListener('beforeunload', cleanup);
 
 // Handle page visibility changes
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && isInitialized) {
-    // Page became visible, check if we need to reconnect
-    if (ws && ws.readyState === WebSocket.CLOSED) {
-      console.log('Page visible, attempting reconnection...');
-      connectWebSocket().catch(error => {
-        console.error('Reconnection failed:', error);
-      });
-    }
-  }
+      if (ws && ws.readyState === WebSocket.CLOSED) {
+        console.log('Page visible, attempting reconnection...');
+        connectWebSocket()
+          .then(() => startRecorderPeer().catch(e => console.warn('recorder restart failed:', e)))
+          .catch(error => {
+            console.error('Reconnection failed:', error);
+          });
+      }
+
 });
