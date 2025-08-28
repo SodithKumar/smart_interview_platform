@@ -46,7 +46,7 @@ class FileStorageManager:
         with open(filepath, 'w') as f:
             json.dump(data, f, indent=2, default=str)
 
-    def create_room(self, max_participants: int = 6) -> str:
+    def create_room(self, max_participants: int = 100) -> str:
         """Create new room and return room_id"""
         room_id = str(uuid.uuid4())[:8]
 
@@ -84,9 +84,9 @@ class FileStorageManager:
             if room_id not in rooms:
                 raise HTTPException(status_code=404, detail="Room not found")
 
-            room = rooms[room_id]
-            if room["current_participants"] >= room["max_participants"]:
-                raise HTTPException(status_code=400, detail="Room is full")
+            # room = rooms[room_id]
+            # if room["current_participants"] >= room["max_participants"]:
+            #     raise HTTPException(status_code=400, detail="Room is full")
 
             # Add user to participants
             participants = self._read_json(self.participants_file)
