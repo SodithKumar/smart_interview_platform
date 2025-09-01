@@ -2,7 +2,7 @@ from pydantic import BaseModel
 
 
 class CreateRoomRequest(BaseModel):
-    max_participants: int = 6
+    max_participants: int = 100
 
 
 class JoinRoomRequest(BaseModel):
