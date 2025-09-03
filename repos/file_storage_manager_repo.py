@@ -46,7 +46,7 @@ class FileStorageManager:
         with open(filepath, 'w') as f:
             json.dump(data, f, indent=2, default=str)
 
-    def create_room(self, max_participants: int = 6) -> str:
+    def create_room(self, max_participants: int = 100) -> str:
         """Create new room and return room_id"""
         room_id = str(uuid.uuid4())[:8]
 
@@ -76,7 +76,6 @@ class FileStorageManager:
 
     def join_room(self, room_id: str, display_name: str) -> dict:
         """Add user to room, return user info"""
-        user_id = str(uuid.uuid4())[:8]
 
         with self.file_lock:
             # Check if room exists and has space
@@ -84,15 +83,21 @@ class FileStorageManager:
             if room_id not in rooms:
                 raise HTTPException(status_code=404, detail="Room not found")
 
-            room = rooms[room_id]
-            if room["current_participants"] >= room["max_participants"]:
-                raise HTTPException(status_code=400, detail="Room is full")
-
-            # Add user to participants
+            # Load participants
             participants = self._read_json(self.participants_file)
             if room_id not in participants:
                 participants[room_id] = {}
 
+            # ✅ Check if same display_name already exists
+            for uid, info in participants[room_id].items():
+                if info["display_name"] == display_name:
+                    info["is_connected"] = True
+                    info["joined_at"] = datetime.now().isoformat()
+                    self._write_json(self.participants_file, participants)
+                    return info
+
+            # Else create new user
+            user_id = str(uuid.uuid4())[:8]
             user_info = {
                 "user_id": user_id,
                 "display_name": display_name,
